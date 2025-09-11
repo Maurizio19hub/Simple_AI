@@ -35,6 +35,16 @@ def createWeights() -> dict:
     return Net
 
 
+def gradientFun() -> dict:
+    Grad = dict()
+    for i in range(1, len(NN)):
+        w = np.zeros((NN[i-1], NN[i]))
+        b = np.zeros(NN[i])
+        Grad[f'layer{i}'] = {}
+        Grad[f'layer{i}']["w"] = w
+        Grad[f'layer{i}']["b"] = b
+    return Grad
+
 def loadImages():
     with open("train-images-idx3-ubyte/train-images.idx3-ubyte", "rb") as f:
         #headers
@@ -59,8 +69,13 @@ def batchGenerator(batch_size, images, labels):
     for i in range(0, images.shape[0], batch_size):
         yield images[i : i + batch_size], labels[i : i + batch_size]
     
-def backProp():
-    pass
+def backPropDelta(a, one_hot, h, prev_delta, Net):
+    if h == len(NN) - 1:
+        delta = 2 * (a - one_hot) * a * (np.ones(NN[h]) - a) #assicurarsi che sia una operazione tra vettori prima di moltiplicare per a(N-1)
+    else:
+        delta = np.dot(Net[f'layer{h+1}']["w"], prev_delta) * (1 - a) * a #per layer intermedi
+        print(delta.shape)
+    return delta
 
 
 def sigmoidFun(x):
@@ -73,6 +88,8 @@ def lossFun(x, y):
         sum += pow((bit_x - bit_y), 2)
     return sum'''
     return np.sum(np.power((x - y), 2))
+
+
 
 def main():
     #se i pesi sono gia salvati nel file json, allora procedo a prelevarli, altrimenti li genero
@@ -93,18 +110,24 @@ def main():
     labels = loadLabels()
     batch_size = 32
     #print(labels)
+
+    #Creazione del Gradiente
+    batchGrad = gradientFun()
     
+    #BATCH IMMAGINI
     for images_batch, labels_batch in batchGenerator(batch_size, images, labels):
         avg_loss = 0
+        #SINGOLA IMMAGINE DEL BATCH
         for image, label in zip(images_batch, labels_batch):
             #image = images_batch[0]
             #label = labels_batch[0]
 
             Net[f'layer{0}'] = {}
             Net[f'layer{0}']["a"] = image
+            #PER LA SINGOLA IMMAGINE CONSIDERO OGNI LAYER
             for r in range(1, len(NN)):
                 #al passaggio al layer successivo devo cambiare image nel nuovo stato che sarà un vettore più corto e formato da sigmoidi
-                
+                #PER OGNI LAYER CONSIDERO OGNI NODO
                 for i in range(NN[r]):
                     sum = 0
                     
@@ -121,16 +144,36 @@ def main():
 
             #ora che ho l'output della rete (layer3) posso calcolare le funzioni di costo per ogni immagine e poi fare la media di queste per il signolo batch
             #print(Net[f'layer{(len(NN)-1)}']["a"], label)
-            
+            delta = None
+            for h in range(len(NN)-1, 0, -1):
+                print(h)
+                prev_delta = delta
+                var_a = Net[f'layer{h}']["a"]
+                var_a_prev = Net[f'layer{h-1}']["a"]
+                delta = backPropDelta(var_a, label, h, prev_delta, Net)
+                batchGrad[f'layer{h}']["w"] += np.outer(var_a_prev, delta) #gradiente del layer corrente per w
+                batchGrad[f'layer{h}']["b"] += delta
+                #print((Net[f'layer{h}']["w"]).shape, delta.shape, (Net[f'layer{h-1}']["a"]).shape)
+                
+
             loss_fun = lossFun(Net[f'layer{(len(NN)-1)}']["a"], label)
             avg_loss += loss_fun
             print(loss_fun, avg_loss)
             #print(np.sum(np.power((Net[f'layer{(len(NN)-1)}']["a"] - label), 2)))
-        avg_loss = avg_loss / batch_size
-        print(avg_loss) #sembra workare
+        
+        avg_loss /= batch_size
+        for layer in batchGrad:
+            print("***************", batchGrad[layer]["b"])
+            batchGrad[layer]["w"] /= batch_size
+            batchGrad[layer]["b"] /= batch_size
+            print(batchGrad[layer]["b"])
+        print(avg_loss) #sembra workare, abbiamo ottenuto la media dei gradienti di w e b rispetto al batch
 
         #*******
-        #adesso devo aggiustare i pesi con la backpropagation
+        #adesso devo aggiustare i pesi con l'utilizzo dei gradienti medi e poi basta ripetere per tutti i batch
+        print("########################")
+        print(batchGrad[f'layer{1}']["w"].shape)
+        print(batchGrad[f'layer{1}']["b"].shape)
         #*******
 
         return

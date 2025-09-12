@@ -74,7 +74,7 @@ def backPropDelta(a, one_hot, h, prev_delta, Net):
         delta = 2 * (a - one_hot) * a * (np.ones(NN[h]) - a) #assicurarsi che sia una operazione tra vettori prima di moltiplicare per a(N-1)
     else:
         delta = np.dot(Net[f'layer{h+1}']["w"], prev_delta) * (1 - a) * a #per layer intermedi
-        print(delta.shape)
+        #print(delta.shape)
     return delta
 
 
@@ -89,9 +89,20 @@ def lossFun(x, y):
     return sum'''
     return np.sum(np.power((x - y), 2))
 
-
+def testingFun():
+    pass
 
 def main():
+    scelta = int(input("Selezionare cosa si vuole fare:"
+    "   1) Fase di addestramento"
+    "   2) Fase di testing"))
+    if scelta == 2:
+        testingFun()
+        return
+    elif scelta != 1:
+        print("Scelta non valida.")
+        return
+
     #se i pesi sono gia salvati nel file json, allora procedo a prelevarli, altrimenti li genero
     if os.path.exists("net.json") and os.path.getsize("net.json") > 0:
         with open("net.json", "r") as f:
@@ -113,8 +124,11 @@ def main():
 
     #Creazione del Gradiente
     batchGrad = gradientFun()
+
+    
     
     #BATCH IMMAGINI
+    batch_counter = 0
     for images_batch, labels_batch in batchGenerator(batch_size, images, labels):
         avg_loss = 0
         #SINGOLA IMMAGINE DEL BATCH
@@ -124,6 +138,7 @@ def main():
 
             Net[f'layer{0}'] = {}
             Net[f'layer{0}']["a"] = image
+        
             #PER LA SINGOLA IMMAGINE CONSIDERO OGNI LAYER
             for r in range(1, len(NN)):
                 #al passaggio al layer successivo devo cambiare image nel nuovo stato che sarà un vettore più corto e formato da sigmoidi
@@ -146,7 +161,7 @@ def main():
             #print(Net[f'layer{(len(NN)-1)}']["a"], label)
             delta = None
             for h in range(len(NN)-1, 0, -1):
-                print(h)
+                #print(h)
                 prev_delta = delta
                 var_a = Net[f'layer{h}']["a"]
                 var_a_prev = Net[f'layer{h-1}']["a"]
@@ -158,25 +173,50 @@ def main():
 
             loss_fun = lossFun(Net[f'layer{(len(NN)-1)}']["a"], label)
             avg_loss += loss_fun
-            print(loss_fun, avg_loss)
+            #print(loss_fun, avg_loss)
             #print(np.sum(np.power((Net[f'layer{(len(NN)-1)}']["a"] - label), 2)))
         
         avg_loss /= batch_size
         for layer in batchGrad:
-            print("***************", batchGrad[layer]["b"])
+            #print("***************", batchGrad[layer]["b"])
             batchGrad[layer]["w"] /= batch_size
             batchGrad[layer]["b"] /= batch_size
-            print(batchGrad[layer]["b"])
-        print(avg_loss) #sembra workare, abbiamo ottenuto la media dei gradienti di w e b rispetto al batch
+            #print(batchGrad[layer]["b"])
+        #sembra workare, abbiamo ottenuto la media dei gradienti di w e b rispetto al batch
 
         #*******
         #adesso devo aggiustare i pesi con l'utilizzo dei gradienti medi e poi basta ripetere per tutti i batch
-        print("########################")
+        '''print("########################")
         print(batchGrad[f'layer{1}']["w"].shape)
-        print(batchGrad[f'layer{1}']["b"].shape)
+        print(batchGrad[f'layer{1}']["b"].shape)'''
+
+        learning_rate = 0.01
+        for layer in batchGrad:
+            #print("£££££££££££££££££", Net[layer]["b"])     
+            Net[layer]["w"] -= learning_rate * batchGrad[layer]["w"]
+            Net[layer]["b"] -= learning_rate * batchGrad[layer]["b"]
+            #print(Net[layer]["b"])
         #*******
 
-        return
+        print(f'Batch calcolato : {batch_counter} ; con loss : {avg_loss}')
+        batch_counter += 1
+    
+    Net_json = {}
+
+    for r in range(1, len(NN)):
+        Net_json[f'layer{r}'] = {
+            "w" : Net[f'layer{r}']["w"].tolist(),
+            "b" : Net[f'layer{r}']["b"].tolist(),
+            "a" : Net[f'layer{r}']["a"].tolist()
+        }
+
+    with open("net_trained.json", "w") as f:
+        json.dump(Net_json, f)
+    print("File net_trained.json creato con i pesi e i bias aggiornati")
+    return
+    
+
+
 
 
 

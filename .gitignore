@@ -1,3 +1,5 @@
 digit-recog/target/*
 digit-recog/Cargo.lock
+byte_image.py
+data.txt
 

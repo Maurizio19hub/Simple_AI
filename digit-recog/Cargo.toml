@@ -22,3 +22,6 @@ serde_json = "1.0"
 
 #Processing delle immagini
 base64 = "0.22"
+
+#Pythin intergration
+pyo3 = { version = "0.18", features = ["auto-initialize"] }
